@@ -1,0 +1,8 @@
+{
+    "aria_input_data_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/SynEnvDataset",
+    "aria_ply_data_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/PLYDataset/",
+    "scene_number_range_to_process" : [0,0],
+    "v_fov_angle" : 120,
+    "h_fov_angle" : 150
+
+}

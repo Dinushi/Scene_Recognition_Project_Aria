@@ -1,0 +1,5 @@
+{
+    "aria_input_data_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/SynEnvDataset",
+    "scene_number_range_to_process" : [0,0],
+    "output_ply_write_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/PLYDataset/"
+}
