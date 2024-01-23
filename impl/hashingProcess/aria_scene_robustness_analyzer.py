@@ -57,7 +57,7 @@ class GraphicalVisualizer():
         plt.grid(True)
         plt.show()
 
-class Analyzer:
+class RobustnessAnalyzer:
     def __init__(self, configsMap, original_hash_key_dict, test_hash_dictionary):
         self.configsMap = configsMap
         self.original_hash_key_dict = original_hash_key_dict #format => {Scene_1 : hash_string, Scene_2 : hash_string, ...}
@@ -111,23 +111,57 @@ class Analyzer:
         plt.figure(figsize=(10, 6))
 
         for scene_no, tragecTimestamp_and_hash_dict_unsorted in self.test_hash_dictionary.items():
-            tragecTimestamp_and_hash_dict = {k: tragecTimestamp_and_hash_dict_unsorted[k] for k in sorted(tragecTimestamp_and_hash_dict_unsorted)}
+            # sort the test_dict as its unsorted in csvs
+            if (scene_no == 5):
+                tragecTimestamp_and_hash_dict = {k: tragecTimestamp_and_hash_dict_unsorted[k] for k in sorted(tragecTimestamp_and_hash_dict_unsorted)}
 
-            tg_timestamp_lits_scene = []
-            hdist_list_scene = []
-            
-            original_hash_string = self.original_hash_key_dict[scene_no]
-            for tg_timestamp, tg_hash_string in tragecTimestamp_and_hash_dict.items ():
-                hamming_dist_score = computeHammingDistancePercentage(original_hash_string, tg_hash_string)
-                print("HM dist original-original: " + str(computeHammingDistancePercentage(original_hash_string, original_hash_string)))
-                tg_timestamp_lits_scene.append(tg_timestamp)
-                hdist_list_scene.append(hamming_dist_score)
+                tg_timestamp_lits_scene = []
+                hdist_list_scene = []
+                
+                original_hash_string = self.original_hash_key_dict[scene_no]
+                for tg_timestamp, tg_hash_string in tragecTimestamp_and_hash_dict.items ():
+                    hamming_dist_score = computeHammingDistancePercentage(original_hash_string, tg_hash_string)
+                    print("HM dist original-original: " + str(computeHammingDistancePercentage(original_hash_string, original_hash_string)))
+                    tg_timestamp_lits_scene.append(tg_timestamp)
+                    hdist_list_scene.append(hamming_dist_score)
 
-            plt.plot(tg_timestamp_lits_scene, hdist_list_scene, label="scene_number: "+str(scene_no))
+                plt.plot([value / 1000 for value in tg_timestamp_lits_scene], hdist_list_scene, label="scene_number: "+str(scene_no))
     
         plt.title('Hamming Distance score (Hash Difference) of each Camara View hash against the hash of entire scene')
-        plt.xlabel('Timestamp at each tragectory point (ms)')
+
+        plt.xlabel('Timestamp at each tragectory point (milli seconds)')
         plt.ylabel('Hamming Distance (%)')
+        plt.legend()
+        plt.grid(True)
+        #plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.show()
+
+    def analyze_robustness_of_accumilated_trajectory_scene_against_original_scene(self):
+    
+        plt.figure(figsize=(10, 6))
+
+        for scene_no, tragecTimestamp_and_hash_dict_unsorted in self.test_hash_dictionary.items():
+            # sort the test_dict as its unsorted in csvs
+            #if (scene_no == 2):
+                tragecTimestamp_and_hash_dict = {k: tragecTimestamp_and_hash_dict_unsorted[k] for k in sorted(tragecTimestamp_and_hash_dict_unsorted)}
+
+                tg_timestamp_lits_scene = []
+                hdist_list_scene = []
+                
+                original_hash_string = self.original_hash_key_dict[scene_no]
+                for tg_timestamp, tg_hash_string in tragecTimestamp_and_hash_dict.items ():
+                    hamming_dist_score = computeHammingDistancePercentage(original_hash_string, tg_hash_string)
+                    print("HM dist original-original: " + str(computeHammingDistancePercentage(original_hash_string, original_hash_string)))
+                    tg_timestamp_lits_scene.append(tg_timestamp)
+                    hdist_list_scene.append(hamming_dist_score)
+
+                plt.plot(tg_timestamp_lits_scene, hdist_list_scene, label="scene_number: "+str(scene_no))
+    
+        plt.title('Hamming Distance score (Hash Difference) : Accumilating Camara Views vs Entire scene(CROPPED)')
+
+        plt.xlabel('Time at each tragectory point (Seconds)')
+        plt.ylabel('Hamming Distance (%)')
+        plt.xticks(np.arange(0, 21, 1)) 
         plt.legend()
         plt.grid(True)
         #plt.grid(axis='y', linestyle='--', alpha=0.7)

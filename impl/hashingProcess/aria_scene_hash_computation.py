@@ -9,6 +9,7 @@ from common.graph_generation import *
 from common.complexity_analysis import *
 
 from aria_scene_robustness_analyzer import *
+from aria_scene_uniqueness_analyzer import *
 from config_parser import *
 
 import numpy as np
@@ -268,23 +269,25 @@ class HashComputationProcessor:
         tragectory_timestamp = parts[1].replace('.ply', '')
         return scene_number, tragectory_timestamp
 
-    def computeOriginalHashes(self, original_ply_glob_path, output_folder_path, original_scene_hash_csv_name, component_size = 20, 
+    def computeOriginalHashes(self, input_folder_path, scene_number_range, output_folder_path, original_scene_hash_csv_name, component_size = 20, 
                                                                 l2_cluster_enabled = False, in_code_triangulation_required = False):
 
         print("\n======================Compute original hashes==============")
-        pcd_file_list_original = glob.glob(original_ply_glob_path, recursive = True) 
-        print("Original file list: {} \n".format(str(pcd_file_list_original)))
         createNewCSV(output_folder_path, original_scene_hash_csv_name, ["Scene_No", "Point_Count", "Computation_Time(s)", "Hash" ])
 
-        for ply_file_path in pcd_file_list_original:
-            scene_directory_name = os.path.basename(os.path.dirname(ply_file_path))
+        #for ply_file_path in pcd_file_list_original:
+        for scene_number in range(scene_number_range[0], scene_number_range[1] + 1):
+            scene_directory_path =  input_folder_path + "/" + str(scene_number)
+            original_ply_path = scene_directory_path + "/" + str(scene_number) + original_scene_file_suffix +".ply"
+            print("Compute hash for file: {} ====>\n".format(original_ply_path))
+
             start_time = time.time()
-            pcd_file_name, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(ply_file_path, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
+            pcd_file_name, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(original_ply_path, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
             end_time = time.time()
             elapsed_time = end_time - start_time
 
-            original_hash_key_dict[scene_directory_name] = final_binary_string
-            updateExistingCSV(output_folder_path, original_scene_hash_csv_name, [scene_directory_name, point_count, elapsed_time, final_binary_string])
+            original_hash_key_dict[str(scene_number)] = final_binary_string
+            updateExistingCSV(output_folder_path, original_scene_hash_csv_name, [str(scene_number), point_count, elapsed_time, final_binary_string])
 
     def readStoredOriginalHashesFromCSV(self, output_folder_path, original_scene_hash_csv_name):
         original_hash_key_dict = {}
@@ -298,23 +301,23 @@ class HashComputationProcessor:
 
         return original_hash_key_dict
     
-    def computeTestHashes(self, pcd_file_list_test, output_folder_path, test_scene_hash_csv_name, component_size = 20, 
+    def computeTestHashes(self, input_folder_path, scene_number_range, output_folder_path, test_scene_hash_csv_name, component_size = 20, 
                                                                 l2_cluster_enabled = False, in_code_triangulation_required = False):
     
         print("\n===================Compute test hashes ==================== ")
-        pcd_file_list_test = sorted(pcd_file_list_test, key=self.custom_sorting_key)
-        print("\nTest file list: {} \n".format(str(pcd_file_list_test)))
         createNewCSV(output_folder_path,test_scene_hash_csv_name, ["Scene_No", "Point_Count", "Trajectory_Timestamp", "Hash"])
 
-        for ply_file_test in pcd_file_list_test:
-            scene_directory_name = os.path.basename(os.path.dirname(ply_file_test))
-            pcd_file_name = os.path.basename(ply_file_test)
-    
-            pcd_file_name_r, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(ply_file_test, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
+        for scene_number in range(scene_number_range[0], scene_number_range[1] + 1):
+            scene_directory_path = input_folder_path + "/" + str(scene_number)
+            scene_test_file_list = [file for file in glob.glob(scene_directory_path + "/*.ply", recursive=True) if "original" not in os.path.basename(file)]
+            scene_test_file_list_sorted = sorted(scene_test_file_list, key=self.custom_sorting_key)
+            for ply_file_test in scene_test_file_list_sorted:
+                pcd_file_name = os.path.basename(ply_file_test)
+                pcd_file_name_r, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(ply_file_test, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
 
-            # save results to the test data csv
-            trajectory_timetamp = pcd_file_name.split('_')[1].replace('.ply', '')
-            updateExistingCSV(output_folder_path, test_scene_hash_csv_name, [scene_directory_name, point_count, trajectory_timetamp, final_binary_string])
+                # save results to the test data csv
+                trajectory_timetamp = pcd_file_name.split('_')[1].replace('.ply', '')
+                updateExistingCSV(output_folder_path, test_scene_hash_csv_name, [str(scene_number), point_count, trajectory_timetamp, final_binary_string])
 
     def readTestHashes(self, output_folder_path, test_scene_hash_csv_name):
         test_hash_dictionary = {}
@@ -336,6 +339,17 @@ class HashComputationProcessor:
                 test_hash_dictionary[scene_name] = {attack: test_hash_str}
 
         return test_hash_dictionary
+    
+class ParameterSet:
+    
+    def __init__(self, component_size, nn_normals_comp_max_radius, nn_FPFH_comp_max_radius):
+        # boolean params
+
+        # numbered params
+        self.component_size = component_size
+        self.nn_normals_comp_max_radius = nn_normals_comp_max_radius
+        nn_FPFH_comp_max_radius = nn_FPFH_comp_max_radius
+
                 
 
 if __name__ == "__main__":
@@ -344,8 +358,8 @@ if __name__ == "__main__":
     configParser = ConfigParser(config_file_path)
 
     component_size = configParser.getConfigParam("component_size") # 100 means final hash has 100*33 bits when L2 cluster is disabled
-    radius_max_nn_normals_comp = list(configParser.getConfigParam("radius_max_nn_normals_comp"))
-    radius_max_nn_FPFH_comp = list(configParser.getConfigParam("radius_max_nn_FPFH_comp"))
+    nn_normals_comp_max_radius_list = list(configParser.getConfigParam("radius_max_nn_normals_comp"))
+    nn_FPFH_comp_max_radius_list = list(configParser.getConfigParam("radius_max_nn_FPFH_comp"))
 
     l2_cluster_enabled = configParser.getConfigParam("l2_cluster_enabled")
     in_code_triangulation_required = configParser.getConfigParam("in_code_triangulation_required")
@@ -356,45 +370,47 @@ if __name__ == "__main__":
 
     input_folder_path = configParser.getConfigParam("input_folder_path")
     output_folder_path = makeAdirectoryAtGivenPath(input_folder_path, str(configParser.getConfigParam("output_folder_name")))
+    scene_number_range = list(configParser.getConfigParam("scene_number_range_to_process"))
 
-    original_scene_hash_csv_name = "original_scene_hash_set" 
-    original_hash_key_dict = {} #format => {Scene_1 :  hash_string,  Scene_1: hash_string,  ...}
+    #original_scene_hash_csv_name = "original_scene_hash_set"
+    original_scene_hash_csv_name = configParser.getConfigParam("original_hash_write_csv_name")
+
+    #test_scene_hash_csv_name = "test_scene_hash_set"
+    test_scene_hash_csv_name = configParser.getConfigParam("test_hash_write_csv_name")
 
     threshold = int(configParser.getConfigParam("hash_comparison_threshold"))
-
     hashComputationProcessor = HashComputationProcessor(configParser, component_size)
 
+    original_scene_file_suffix = configParser.getConfigParam("original_scene_file_suffix") # this is generally "_original"
+    original_hash_key_dict = {} #format => {Scene_1 :  hash_string,  Scene_1: hash_string,  ...}
     if (compute_original):
-        original_ply_glob_path = input_folder_path + "/***/*_original.ply"
-        hashComputationProcessor.computeOriginalHashes(original_ply_glob_path, output_folder_path, original_scene_hash_csv_name, component_size)
-
+        hashComputationProcessor.computeOriginalHashes(input_folder_path, scene_number_range, output_folder_path, original_scene_hash_csv_name, component_size)
     else: 
         original_hash_key_dict = hashComputationProcessor.readStoredOriginalHashesFromCSV(output_folder_path, original_scene_hash_csv_name)
 
-    test_scene_hash_csv_name = "test_scene_hash_set"
-    test_hash_dictionary = {} #format => {Scene_1 : {timestamp: hash_string,  timestamp: hash_string, ..}, ...}
     
+    test_hash_dictionary = {} #format => {Scene_1 : {timestamp: hash_string,  timestamp: hash_string, ..}, ...}
     if (compute_test):
-        pcd_file_list_test = [file for file in glob.glob(input_folder_path + "/***/*.ply", recursive=True) if "original" not in os.path.basename(file)]
-        hashComputationProcessor.computeTestHashes(pcd_file_list_test, output_folder_path,test_scene_hash_csv_name, component_size)
-
+        hashComputationProcessor.computeTestHashes(input_folder_path, scene_number_range, output_folder_path,test_scene_hash_csv_name, component_size)
     else:
         test_hash_dictionary = hashComputationProcessor.readTestHashes(output_folder_path, test_scene_hash_csv_name)
 
+
     if (analyze):
         threshold = 30
-        analyzer = Analyzer(configsMap, original_hash_key_dict, test_hash_dictionary)
+        uAnalyzer = UniquenessAnalyzer(configsMap, original_hash_key_dict, test_hash_dictionary)
+        rAnalyzer = RobustnessAnalyzer(configsMap, original_hash_key_dict, test_hash_dictionary)
        
         # for uniqueness
-        #analyzer.analyzeHDBetweenOriginalScenes(threshold)
+        #uAnalyzer.analyze_hammingDist_between_original_scenes(threshold)
+
         #=>analyzer.analyzeHDBetweenDifferentTestScenes(threshold)
         #analyzer.analyzeHDBetween_All_DifferentTestScenes(threshold)
 
-        
-
         # for robustness
         ## new
-        analyzer.analyze_robustness_of_trajectory_scene_against_original_scene()
+        rAnalyzer.analyze_robustness_of_trajectory_scene_against_original_scene()
+        #rAnalyzer.analyze_robustness_of_accumilated_trajectory_scene_against_original_scene()
 
 
         

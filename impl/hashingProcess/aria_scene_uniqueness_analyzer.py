@@ -19,14 +19,14 @@ class GraphicalVisualizer():
 
         # Plot the histogram
         plt.hist(hammming_dist_array, bins=bin_edges, edgecolor='black', alpha=0.7)
-        plt.title('Histogram of Hamming Distance score between scenes - 3D Hashing for ' + title_name)
-        plt.xlabel('Hamming Distance Score')
+        plt.title('Histogram of Hamming Distance score (Hash Difference) between scenes - ' + title_name)
+        plt.xlabel('Hamming Distance Score (Hash Difference) %')
         plt.ylabel('Frequency')
         plt.grid(axis='y', linestyle='--', alpha=0.7)
 
         plt.show()
 
-    def plotHeatMapOfOriginalSceneHammingDistances(self, original_hash_key_dict):
+    def plotHeatMapOfOriginalSceneHammingDistances(self, original_hash_key_dict, title_name):
 
         sorted_original_hash_key_dict = {k: original_hash_key_dict[k] for k in sorted(original_hash_key_dict)}
 
@@ -43,6 +43,7 @@ class GraphicalVisualizer():
 
         data_array = np.array(heatmap_data)
         sns.heatmap(data_array, xticklabels=scene_names_x, yticklabels=scene_names_x, cmap='Blues', annot=True, vmin=0, vmax=100)
+        plt.title("Heatmap Hamming Distance score (Hash Difference) between scenes - " + title_name)
         plt.show()
 
     def plotMutipleGraphsInOnePlot(self, x_data_array, y_data_dict, scene_name = "A"):
@@ -57,7 +58,7 @@ class GraphicalVisualizer():
         plt.grid(True)
         plt.show()
 
-class Analyzer:
+class UniquenessAnalyzer:
     def __init__(self, configsMap, original_hash_key_dict, test_hash_dictionary):
         self.configsMap = configsMap
         self.original_hash_key_dict = original_hash_key_dict #format => {Scene_1 : hash_string, Scene_2 : hash_string, ...}
@@ -95,8 +96,8 @@ class Analyzer:
         print("\tTotal different pair combinations : {}, total_higher_than_threshold: {} , total_lesser_than_threshold : {}".format(total_combinations, correct, incorrect))
         print("\tAccuracy for different original scene pairs: " + str((correct/total_combinations)* 100))
         graphicalVisualizer = GraphicalVisualizer()
-        graphicalVisualizer.plotHistogramHamingDistanceDistribution(hamming_dist_score_array, "Entire Scenes")
-        graphicalVisualizer.plotHeatMapOfOriginalSceneHammingDistances(self.original_hash_key_dict)
+        graphicalVisualizer.plotHistogramHamingDistanceDistribution(hamming_dist_score_array, "Entire Scenes - 10")
+        graphicalVisualizer.plotHeatMapOfOriginalSceneHammingDistances(self.original_hash_key_dict, "Entire Scenes - 10")
 
     def analyzeHDBetweenDifferentTestScenes(self, threshold = 30, attack_name = "FILT130130_30"):
         total_combinations = 0

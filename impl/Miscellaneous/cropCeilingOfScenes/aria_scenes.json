@@ -1,0 +1,5 @@
+{
+    "aria_ply_data_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/PLYDataset",
+    "scene_number_range_to_process" : [0,0],
+    "max_height_z_axis": 3.0
+}
