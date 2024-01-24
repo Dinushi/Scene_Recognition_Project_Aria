@@ -7,7 +7,19 @@ from pathlib import Path
 import igl
 
 # compute the FPFH features for the whole point cloud
-def computeFPFHFeatures(pcd, ):
+def computeFPFHFeatures_2(pcd, normal_radius_max=0.1, normal_max_nn = 30, FPFH_radius_max=0.5, FPFH_max_nn=100):
+    
+    pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=float(normal_radius_max), normal_max_nn=int(normal_max_nn)))
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd, o3d.geometry.KDTreeSearchParamHybrid(radius=float(FPFH_radius_max), FPFH_max_nn=int(FPFH_max_nn)))
+
+    # Convert the FPFH feature vector to a numpy array
+    fpfh_array = np.asarray(pcd_fpfh.data)
+    print("computed FPFH feature shape: =>  " + str(fpfh_array.shape))
+    #print(fpfh_array)
+    #print(fpfh_array[:, 0])
+    return fpfh_array
+
+def computeFPFHFeatures(pcd, normal_radius_max=0.1, normal_max_nn = 30, FPFH_radius_max=0.5, FPFH_max_nn=100):
     radius_normal = 0.1
     radius_fpfh = 0.5
     pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))

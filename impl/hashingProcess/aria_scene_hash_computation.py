@@ -20,16 +20,12 @@ import itertools
 
 from sklearn.cluster import KMeans
 
-# hold te config maps to be accesible golbally accross the code
-configsMap = None
 dict_all_points = {}
 
 class HashCalculator:
 
-    def __init__(self, configParser, component_size):
-        self.configParser = configParser
-        self.component_size = component_size
-
+    def __init__(self, parameterObject):
+        self.parameterObject = parameterObject
 
     def convertFPFHArrayOfRegionToBinary(self, columnwise_fpfh_regions_array, avg_columnwise_fpfh_entire_pcd):
         comparison_result = (columnwise_fpfh_regions_array > avg_columnwise_fpfh_entire_pcd) # an array of arrays of trues and falses [[False False False ... False False False], [False False False ... False False False],..., [False False False ... False  True False]]
@@ -145,20 +141,20 @@ class HashCalculator:
         #mesh.compute_vertex_normals()
         #o3d.visualization.draw_geometries([mesh], mesh_show_back_face=True)
         #return mesh
-        print("Points count in PCD" + str(np.asarray(pcd.points)))
+        #("Points count in PCD" + str(np.asarray(pcd.points)))
 
-        print('run Poisson surface reconstruction')
+        #print('run Poisson surface reconstruction')
 
         with o3d.utility.VerbosityContextManager(
                 o3d.utility.VerbosityLevel.Debug) as cm:
             mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
                 pcd, depth=9)
         #o3d.visualization.draw_geometries([mesh],zoom=0.664,front=[-0.4761, -0.4698, -0.7434],lookat=[1.8900, 3.2596, 0.9284], up=[0.2304, -0.8825, 0.4101])
-        print("Points count in mesh" + str(np.asarray(mesh.vertices)))
+        #print("Points count in mesh" + str(np.asarray(mesh.vertices)))
         return mesh
 
     # This function computes the binary hash for a pcd file at the specified path
-    def execute_computation_on_single_pcd(self, file_path_string, component_size, l2_cluster_enabled, in_code_triangulation_required):
+    def execute_computation_on_single_pcd(self, file_path_string):
 
         pcd_file_name = readInputFilePathData(file_path_string)
         pcd, pcd_points, pcd_normals, pcd_colors = readPointCloudWithDataExtracted(file_path_string)
@@ -167,15 +163,15 @@ class HashCalculator:
         point_count = len(pcd_points)
         model_complexity = None
 
-        if(l2_cluster_enabled):
-            if (in_code_triangulation_required):
+        if(self.parameterObject.l2_cluster_enabled):
+            if (self.parameterObject.in_code_triangulation_required):
                 mesh = self.convertPCDToMesh(pcd)
             else:
                 mesh = readMesh(file_path_string)
                 mean_curv_array = computeNormalizedMeanCurvatures(mesh)
 
-            print("Mean_curvature_array {}".format(mean_curv_array.shape))
-            print(mean_curv_array)
+            #print("Mean_curvature_array {}".format(mean_curv_array.shape))
+            #print(mean_curv_array)
             model_complexity = calculate_complexity(pcd_points, mean_curv_array)
             #visualizeHeatMapsOnPointCloud(pcd, mean_curv_array)
 
@@ -184,11 +180,12 @@ class HashCalculator:
         distances, farthest_dist, farthest_point = findTheDistancesfromcenter(pcd_points, center)
         print("The distance to furtherst point -  {}".format(farthest_dist))
 
-        fpfh_array = computeFPFHFeatures(pcd)
+        fpfh_array = computeFPFHFeatures(pcd, self.parameterObject.normal_max_radius, self.parameterObject.normal_max_nn, 
+                                                    self.parameterObject.FPFH_max_radius, self.parameterObject.FPFH_max_nn)
         print("FPFH array size - {}".format(fpfh_array.shape))
-        print("FPFH array - {}".format(fpfh_array))
+        #print("FPFH array - {}".format(fpfh_array))
         
-        sub_radii_size = farthest_dist / component_size
+        sub_radii_size = farthest_dist / self.parameterObject.component_size
         print(f"Sub-radii size - {sub_radii_size}")
 
         n_clusters = 5 
@@ -196,7 +193,7 @@ class HashCalculator:
 
         print(f"Summarize features in each spherical cluster ===>")
 
-        for radii_index in range(component_size): 
+        for radii_index in range(self.parameterObject.component_size): 
         
             # find the points belong to given L1 cluster
             radius_start = sub_radii_size * radii_index
@@ -208,7 +205,7 @@ class HashCalculator:
 
             dict_all_points[radii_index] = points_within_range
 
-            print(f"Number of points within radius: {radius_start} and {radius_end}= {len(points_within_range)}")
+            #print(f"Number of points within radius: {radius_start} and {radius_end}= {len(points_within_range)}")
 
             if bool(configParser.getConfigParam("display_pcd_clusters")): 
                 if len(indices_within_range) != 0: visualizeSelectedPoints(points_within_range)
@@ -218,9 +215,9 @@ class HashCalculator:
             # select the fpfh features of te points belong to the L1 cluster
             selected_fpfh_features = fpfh_array[:, indices_within_range]
 
-            print(f"Sub area {str(radii_index)} fpfh array size => {selected_fpfh_features.shape}")
+            #print(f"Sub area {str(radii_index)} fpfh array size => {selected_fpfh_features.shape}")
 
-            if(l2_cluster_enabled):
+            if(self.parameterObject.l2_cluster_enabled):
                 if (len(indices_within_range) != 0 and len(indices_within_range) >= n_clusters) :
                     # get the L2 clusters and their order for the L1 cluster
                     l2_cluster_labels_of_points, sorted_cluster_ids = self.compute_l2_clustering(pcd_points[indices_within_range], mean_curv_array[indices_within_range], n_clusters)
@@ -235,17 +232,17 @@ class HashCalculator:
                 # get the mean of the selected fpfh features for the sub area
                 if (len(indices_within_range) != 0):
                     combined_avg_fpfh_features = np.mean(selected_fpfh_features, axis=1, keepdims=True) # todo : change this to median as well and test
-                    print(f"Sub area {str(radii_index)} Averaged fpfh array size => {combined_avg_fpfh_features.shape}")
+                    #print(f"Sub area {str(radii_index)} Averaged fpfh array size => {combined_avg_fpfh_features.shape}")
                     fpfh_sum_columnwise_list.append(combined_avg_fpfh_features) # => todo: save this in a file under the radius index and analyze
                 else:
-                    print(f"Sub area {str(radii_index)} Averaged fpfh array size set with zeros => {np.zeros((selected_fpfh_features.shape[0] , 1)).shape}")
+                    #print(f"Sub area {str(radii_index)} Averaged fpfh array size set with zeros => {np.zeros((selected_fpfh_features.shape[0] , 1)).shape}")
                     fpfh_sum_columnwise_list.append(np.zeros((selected_fpfh_features.shape[0] , 1)))
 
             
         columnwise_fpfh_regions_array = np.concatenate(fpfh_sum_columnwise_list, axis=1)
         print(f"Combined fpfh array size for the entire pcd portions => {columnwise_fpfh_regions_array.shape}")
         avg_columnwise_fpfh_entire_pcd = np.mean(columnwise_fpfh_regions_array, axis=1, keepdims=True)
-        print(f"Averaged fpfh array size  => {avg_columnwise_fpfh_entire_pcd.shape}")
+        print(f"Averaged fpfh array size  => {avg_columnwise_fpfh_entire_pcd.shape}\n")
 
         if (bool(configParser.getConfigParam("windowed_average_for_quantization"))): 
             final_binary_string, binary_array = self.convertFPFHArraysOfRegionToBinaryUsingWindowBasedMethod(columnwise_fpfh_regions_array)
@@ -256,9 +253,9 @@ class HashCalculator:
 
 class HashComputationProcessor:
     
-    def __init__(self, configParser, component_size):
-        self.configParser = configParser
-        self.hashCalculator = HashCalculator(configParser, component_size)
+    def __init__(self, parameterObject):
+        self.parameterObject = parameterObject
+        self.hashCalculator = HashCalculator(parameterObject)
 
     # Define a custom key function to sort the test ply files as they are read unsorted by glob, ordered according to scene number, tragectory timestamp
     def custom_sorting_key(self, file_path):
@@ -269,20 +266,19 @@ class HashComputationProcessor:
         tragectory_timestamp = parts[1].replace('.ply', '')
         return scene_number, tragectory_timestamp
 
-    def computeOriginalHashes(self, input_folder_path, scene_number_range, output_folder_path, original_scene_hash_csv_name, component_size = 20, 
-                                                                l2_cluster_enabled = False, in_code_triangulation_required = False):
-
+    def computeOriginalHashes(self, input_folder_path, output_folder_path, original_scene_hash_csv_name):
+        original_hash_key_dict = {}
         print("\n======================Compute original hashes==============")
         createNewCSV(output_folder_path, original_scene_hash_csv_name, ["Scene_No", "Point_Count", "Computation_Time(s)", "Hash" ])
 
         #for ply_file_path in pcd_file_list_original:
-        for scene_number in range(scene_number_range[0], scene_number_range[1] + 1):
+        for scene_number in range(self.parameterObject.scene_number_range[0], self.parameterObject.scene_number_range[1] + 1):
             scene_directory_path =  input_folder_path + "/" + str(scene_number)
-            original_ply_path = scene_directory_path + "/" + str(scene_number) + original_scene_file_suffix +".ply"
+            original_ply_path = scene_directory_path + "/" + str(scene_number) + self.parameterObject.original_scene_file_suffix +".ply"
             print("Compute hash for file: {} ====>\n".format(original_ply_path))
 
             start_time = time.time()
-            pcd_file_name, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(original_ply_path, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
+            pcd_file_name, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(original_ply_path)
             end_time = time.time()
             elapsed_time = end_time - start_time
 
@@ -293,41 +289,43 @@ class HashComputationProcessor:
         original_hash_key_dict = {}
         # read stored original hashes from csv 
         print("Read stored original hashes from csv")
-        pcd_file_names, point_sizes, hash_strings = readDataFromCSVGivenColumns(output_folder_path, original_scene_hash_csv_name, ["Scene_No", "Point_Count", "Hash"])
+        scene_numbers, point_sizes, hash_strings = readDataFromCSVGivenColumns(output_folder_path, original_scene_hash_csv_name, ["Scene_No", "Point_Count", "Hash"])
 
-        for row_index in range(len(pcd_file_names)):
+        for row_index in range(len(scene_numbers)):
             #print("Scene {} : hash {}".format(pcd_file_names[row_index], hash_strings[row_index] ))
-            original_hash_key_dict[pcd_file_names[row_index]] = hash_strings[row_index]
+            original_hash_key_dict[scene_numbers[row_index]] = hash_strings[row_index]
 
         return original_hash_key_dict
     
-    def computeTestHashes(self, input_folder_path, scene_number_range, output_folder_path, test_scene_hash_csv_name, component_size = 20, 
-                                                                l2_cluster_enabled = False, in_code_triangulation_required = False):
+    def computeTestHashes(self, input_folder_path, output_folder_path, test_scene_hash_csv_name):
     
         print("\n===================Compute test hashes ==================== ")
         createNewCSV(output_folder_path,test_scene_hash_csv_name, ["Scene_No", "Point_Count", "Trajectory_Timestamp", "Hash"])
 
-        for scene_number in range(scene_number_range[0], scene_number_range[1] + 1):
+        for scene_number in range(self.parameterObject.scene_number_range[0], self.parameterObject.scene_number_range[1] + 1):
             scene_directory_path = input_folder_path + "/" + str(scene_number)
             scene_test_file_list = [file for file in glob.glob(scene_directory_path + "/*.ply", recursive=True) if "original" not in os.path.basename(file)]
             scene_test_file_list_sorted = sorted(scene_test_file_list, key=self.custom_sorting_key)
             for ply_file_test in scene_test_file_list_sorted:
+                print("Compute hash for file: {} ====>\n".format(ply_file_test))
                 pcd_file_name = os.path.basename(ply_file_test)
-                pcd_file_name_r, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(ply_file_test, component_size, l2_cluster_enabled, in_code_triangulation_required=False)
+                pcd_file_name_r, point_count, final_binary_string, binary_array, columnwise_fpfh_regions_array, model_complexity = self.hashCalculator.execute_computation_on_single_pcd(ply_file_test)
 
                 # save results to the test data csv
                 trajectory_timetamp = pcd_file_name.split('_')[1].replace('.ply', '')
                 updateExistingCSV(output_folder_path, test_scene_hash_csv_name, [str(scene_number), point_count, trajectory_timetamp, final_binary_string])
+
+        return self.readTestHashes(output_folder_path, test_scene_hash_csv_name)
 
     def readTestHashes(self, output_folder_path, test_scene_hash_csv_name):
         test_hash_dictionary = {}
         # read stored test hashes from csv 
         print("Read stored test hashes from csv")
         #print(readDataFromCSVGivenColumns(output_folder_path, test_scene_hash_csv_name, ["Scene_Name", "Point Count", "Attack", "Final Hash"]))
-        scene_names, attacks, hash_strings = readDataFromCSVGivenColumns(output_folder_path, test_scene_hash_csv_name, ["Scene_No", "Trajectory_Timestamp", "Hash"])
+        scene_numbers, attacks, hash_strings = readDataFromCSVGivenColumns(output_folder_path, test_scene_hash_csv_name, ["Scene_No", "Trajectory_Timestamp", "Hash"])
 
-        for row_index in range(len(scene_names)):
-            scene_name = scene_names[row_index]
+        for row_index in range(len(scene_numbers)):
+            scene_name = scene_numbers[row_index]
             attack = attacks[row_index]
             test_hash_str = hash_strings[row_index]
             if scene_name in test_hash_dictionary:
@@ -337,29 +335,57 @@ class HashComputationProcessor:
                 test_hash_dictionary[scene_name] = inner_dict
             else:
                 test_hash_dictionary[scene_name] = {attack: test_hash_str}
-
         return test_hash_dictionary
     
 class ParameterSet:
     
-    def __init__(self, component_size, nn_normals_comp_max_radius, nn_FPFH_comp_max_radius):
+    def __init__(self, component_size = 20, scene_number_range = [0,0],  normal_max_radius = 0.1, normal_max_nn = 30, 
+                 FPFH_max_radius = 0.5, FPFH_max_nn=100, original_scene_file_suffix = "_original", 
+                 l2_cluster_enabled = False, in_code_triangulation_required = False):
         # boolean params
+        self.l2_cluster_enabled = l2_cluster_enabled
+        self.in_code_triangulation_required = in_code_triangulation_required
 
         # numbered params
         self.component_size = component_size
-        self.nn_normals_comp_max_radius = nn_normals_comp_max_radius
-        nn_FPFH_comp_max_radius = nn_FPFH_comp_max_radius
+        self.normal_max_radius = normal_max_radius
+        self.normal_max_nn = normal_max_nn
+        self.FPFH_max_radius = FPFH_max_radius
+        self.FPFH_max_nn = FPFH_max_nn
 
-                
+        # list type parameters
+        self.scene_number_range = scene_number_range
+
+        # string type parameters
+        self.original_scene_file_suffix = original_scene_file_suffix
+
+def get_computed_original_and_test_dicts(parameterObject, input_folder_path, output_folder_path, original_scene_hash_csv_name, test_scene_hash_csv_name):
+
+    hashComputationProcessor = HashComputationProcessor(parameterObject)
+
+    original_hash_key_dict = {} #format => {Scene_1 :  hash_string,  Scene_1: hash_string,  ...}
+    if (compute_original):
+        original_hash_key_dict = hashComputationProcessor.computeOriginalHashes(input_folder_path, output_folder_path, original_scene_hash_csv_name)
+    else: 
+        original_hash_key_dict = hashComputationProcessor.readStoredOriginalHashesFromCSV(output_folder_path, original_scene_hash_csv_name)
+
+    test_hash_dictionary = {} #format => {Scene_1 : {timestamp: hash_string,  timestamp: hash_string, ..}, ...}
+    if (compute_test):
+        test_hash_dictionary = hashComputationProcessor.computeTestHashes(input_folder_path, output_folder_path, test_scene_hash_csv_name)
+    else:
+        test_hash_dictionary = hashComputationProcessor.readTestHashes(output_folder_path, test_scene_hash_csv_name)
+
+    return original_hash_key_dict, test_hash_dictionary
+
 
 if __name__ == "__main__":
 
     config_file_path = generateAndAccessArgsForConfigFile()
     configParser = ConfigParser(config_file_path)
 
-    component_size = configParser.getConfigParam("component_size") # 100 means final hash has 100*33 bits when L2 cluster is disabled
-    nn_normals_comp_max_radius_list = list(configParser.getConfigParam("radius_max_nn_normals_comp"))
-    nn_FPFH_comp_max_radius_list = list(configParser.getConfigParam("radius_max_nn_FPFH_comp"))
+    component_sizes_list = list(configParser.getConfigParam("component_sizes")) # 100 means final hash has 100*33 bits when L2 cluster is disabled
+    normal_radius_nn_list = list(configParser.getConfigParam("normal_radius_nn_list"))
+    FPFH_radius_nn_list = list(configParser.getConfigParam("FPFH_radius_nn_list"))
 
     l2_cluster_enabled = configParser.getConfigParam("l2_cluster_enabled")
     in_code_triangulation_required = configParser.getConfigParam("in_code_triangulation_required")
@@ -379,40 +405,56 @@ if __name__ == "__main__":
     test_scene_hash_csv_name = configParser.getConfigParam("test_hash_write_csv_name")
 
     threshold = int(configParser.getConfigParam("hash_comparison_threshold"))
-    hashComputationProcessor = HashComputationProcessor(configParser, component_size)
+    original_scene_file_suffix = configParser.getConfigParam("original_scene_file_suffix")
 
-    original_scene_file_suffix = configParser.getConfigParam("original_scene_file_suffix") # this is generally "_original"
-    original_hash_key_dict = {} #format => {Scene_1 :  hash_string,  Scene_1: hash_string,  ...}
-    if (compute_original):
-        hashComputationProcessor.computeOriginalHashes(input_folder_path, scene_number_range, output_folder_path, original_scene_hash_csv_name, component_size)
-    else: 
-        original_hash_key_dict = hashComputationProcessor.readStoredOriginalHashesFromCSV(output_folder_path, original_scene_hash_csv_name)
+    threshold = configParser.getConfigParam("hash_comparison_threshold")
 
-    
-    test_hash_dictionary = {} #format => {Scene_1 : {timestamp: hash_string,  timestamp: hash_string, ..}, ...}
-    if (compute_test):
-        hashComputationProcessor.computeTestHashes(input_folder_path, scene_number_range, output_folder_path,test_scene_hash_csv_name, component_size)
-    else:
-        test_hash_dictionary = hashComputationProcessor.readTestHashes(output_folder_path, test_scene_hash_csv_name)
+    iteration_count = -1
+    accuracy_array = []
+    original_test_hash_dict_collection_of_all_itertions = {}
 
+    for component_size in component_sizes_list:
 
-    if (analyze):
-        threshold = 30
-        uAnalyzer = UniquenessAnalyzer(configsMap, original_hash_key_dict, test_hash_dictionary)
-        rAnalyzer = RobustnessAnalyzer(configsMap, original_hash_key_dict, test_hash_dictionary)
-       
-        # for uniqueness
-        #uAnalyzer.analyze_hammingDist_between_original_scenes(threshold)
+        for fpfh_comp_radius_nn_entry in FPFH_radius_nn_list:
+            fpfh_radius = fpfh_comp_radius_nn_entry[0]
+            fpfh_nn = fpfh_comp_radius_nn_entry[1]
 
-        #=>analyzer.analyzeHDBetweenDifferentTestScenes(threshold)
-        #analyzer.analyzeHDBetween_All_DifferentTestScenes(threshold)
+            for normal_comp_radius_nn_entry in normal_radius_nn_list: 
+                iteration_count+=1
+                print("======================== Results for iteration_count ======={}===================>  {}".format(str(normal_comp_radius_nn_entry), str(iteration_count)))
+                normal_radius = normal_comp_radius_nn_entry[0]
+                normal_nn = normal_comp_radius_nn_entry[1]
 
-        # for robustness
-        ## new
-        rAnalyzer.analyze_robustness_of_trajectory_scene_against_original_scene()
-        #rAnalyzer.analyze_robustness_of_accumilated_trajectory_scene_against_original_scene()
+                original_scene_hash_csv_name_itr = original_scene_hash_csv_name + "_" + str(iteration_count)
+                test_scene_hash_csv_name_itr = test_scene_hash_csv_name + "_" + str(iteration_count)
+                parameterObject = ParameterSet(component_size, scene_number_range, normal_radius, normal_nn, fpfh_radius, fpfh_nn, original_scene_file_suffix, l2_cluster_enabled, in_code_triangulation_required)
+        
+                original_hash_key_dict, test_hash_dictionary = get_computed_original_and_test_dicts(parameterObject, input_folder_path, output_folder_path, original_scene_hash_csv_name_itr, test_scene_hash_csv_name_itr)
 
+                original_test_hash_dict_collection_of_all_itertions[iteration_count] = (original_hash_key_dict, test_hash_dictionary)
 
+                if (analyze):
+        
+                    uAnalyzer = UniquenessAnalyzer(output_folder_path, original_hash_key_dict, test_hash_dictionary, threshold)
+                    rAnalyzer = RobustnessAnalyzer(output_folder_path, original_hash_key_dict, test_hash_dictionary, threshold)
+        
+                    if (scene_number_range[0] != scene_number_range[1]):
+                        uAnalyzer.analyze_hammingDist_between_original_scenes()
+
+                    accuracy = rAnalyzer.analyze_robustness_of_trajectory_scene_against_original_scene()
+                    accuracy_array.append(accuracy)
+
+    robustnessAnalyzerForAllIterations = RobustnessAnalyzerForAllIterations(original_test_hash_dict_collection_of_all_itertions, threshold) 
+    if (scene_number_range[0] == scene_number_range[1]):
+        # these methods can be run only when a single scene is analyzed
+        robustnessAnalyzerForAllIterations.plot_accuracy_against_changed_param(range(iteration_count+1), accuracy_array, normal_radius_nn_list, "Accuracy of scene robustness with normal computation neighboord and radius", "max neighboord radius and point count", "Accuracy for robustness of Views" )
+        robustnessAnalyzerForAllIterations.analyze_robustness_of_trajectory_scene_againt_changedParameter_for_singleScene("Radius/NN - Normal Comp.", normal_radius_nn_list)
+
+        #robustnessAnalyzerForAllIterations.plot_accuracy_against_changed_param(range(iteration_count+1), accuracy_array, FPFH_radius_nn_list, "Accuracy of scene robustness with FPFH computation neighboord and radius", "max neighboord radius and point count", "Accuracy for robustness of Views" )
+        #robustnessAnalyzerForAllIterations.analyze_robustness_of_trajectory_scene_againt_changedParameter_for_singleScene("Radius/NN - FPFH Comp.", FPFH_radius_nn_list)
+
+        #robustnessAnalyzerForAllIterations.plot_accuracy_against_changed_param(range(iteration_count+1), accuracy_array, component_sizes_list, "Accuracy of scene robustness with No of Clusters", "No of Clusters", "Accuracy for robustness of Views" )
+        #robustnessAnalyzerForAllIterations.analyze_robustness_of_trajectory_scene_againt_changedParameter_for_singleScene("No of Clusters", component_sizes_list)
         
         #analyzer.computeTotalMetrics(threshold)
         #analyzer.computeAttackWiseMetrics("FILT", threshold) # SPD_, R_, RCrop, RNoise, HCrop 

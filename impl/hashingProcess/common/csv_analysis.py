@@ -24,12 +24,12 @@ def readDataFromCSVGivenColumns(folder_path, csv_file_name, usecols):
    df = pd.read_csv(file_path,  usecols=usecols)
 
    for value_array in df.values:
-        pcd_file_names = np.append(pcd_file_names, value_array[0])
+        pcd_file_names.append(int(value_array[0]))
         pcd_file_point_sizes = np.append(pcd_file_point_sizes, value_array[1])
         hash_strings = np.append(hash_strings, value_array[2])
    #print("PCD file names " + str(pcd_file_names))
 
-   return pcd_file_names.tolist(), pcd_file_point_sizes.tolist(), hash_strings.tolist()
+   return pcd_file_names, pcd_file_point_sizes.tolist(), hash_strings.tolist()
 
 def compute_average_scores_of_analyzed_csvs(csv_folder_path, final_csv_name, component_size, iterations):
  

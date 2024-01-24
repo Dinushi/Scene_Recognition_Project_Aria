@@ -1,6 +1,7 @@
 {
     "iterations": 5,
-    "component_size": 20,
+    "component_sizes": [10, 20, 30, 40, 50, 75, 100, 150],
+    "component_sizes_saved": [20],
     "l2_cluster_enabled": false,
     "windowed_average_for_quantization" : false,
     "in_code_triangulation_required" : false,
@@ -9,11 +10,22 @@
     "compute_test_hashes" : false,
     "analyze": true,
 
-    "radius_max_nn_normals_comp" : [[0.1, 30], [0.2, 100], [0.3, 150], [0.4, 200], [0.5, 250], [0.6, 300]],
-    "radius_max_nn_FPFH_comp" : [[0.25, 50], [0.5, 100], [0.75, 150], [1, 200], [1.25, 250], [1.5, 500]],
+    "normal_radius_nn_list" : [[0.1, 30], [0.2, 60], [0.3, 90], [0.4, 120], [0.5, 150], [0.6, 180]],
+
+    "FPFH_radius_nn_list" : [[0.5, 100]],
+    "FPFH_radius_nn_list_saved" : [[0.25, 50], [0.5, 100], [0.75, 150], [1, 200], [1.25, 250], [1.5, 300], [1.75, 350], [2, 400], [2.25, 450], [2.5, 500]],
 
     "input_folder_path" : "/Users/tran5174/Documents/PhD/Scene_Recognition_Project_Aria/PLYDataset",
-    "output_folder_name" : "Results-L1-20",
+    "output_folder_name" : "Results-L1-20_Scene_0_Normal_Radius_NN",
+    "scene_number_range_to_process" : [0,0],
+
+    "original_hash_write_csv_name_1" : "original_scene_hash_set_zcrop",
+    "original_hash_write_csv_name" : "original_scene_hash_set",
+
+    "test_hash_write_csv_name" : "test_scene_hash_set",
+
+    "original_scene_file_suffix_1" : "_originalZCrop",
+    "original_scene_file_suffix" : "_original",
     
     "display_heat_map" : false,
     "display_pcd_clusters" : false,

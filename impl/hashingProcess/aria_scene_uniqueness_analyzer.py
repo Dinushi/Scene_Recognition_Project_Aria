@@ -13,8 +13,9 @@ import seaborn as sns
 
 class GraphicalVisualizer():
 
-    def plotHistogramHamingDistanceDistribution(self, hammming_dist_array, title_name):
+    def plotHistogramHamingDistanceDistribution(self, output_folder_path, hammming_dist_array, title_name):
         # Define the bin edges based on your requirements (0-5, 5-10, ..., 95-100)
+        plt.figure(figsize=(20, 20))
         bin_edges = np.arange(0, 105, 5)
 
         # Plot the histogram
@@ -23,10 +24,10 @@ class GraphicalVisualizer():
         plt.xlabel('Hamming Distance Score (Hash Difference) %')
         plt.ylabel('Frequency')
         plt.grid(axis='y', linestyle='--', alpha=0.7)
-
+        #plt.savefig(output_folder_path +'filename.png', bbox_inches='tight')
         plt.show()
 
-    def plotHeatMapOfOriginalSceneHammingDistances(self, original_hash_key_dict, title_name):
+    def plotHeatMapOfOriginalSceneHammingDistances(self, output_folder_path, original_hash_key_dict, title_name):
 
         sorted_original_hash_key_dict = {k: original_hash_key_dict[k] for k in sorted(original_hash_key_dict)}
 
@@ -59,10 +60,11 @@ class GraphicalVisualizer():
         plt.show()
 
 class UniquenessAnalyzer:
-    def __init__(self, configsMap, original_hash_key_dict, test_hash_dictionary):
-        self.configsMap = configsMap
+    def __init__(self, output_folder_path, original_hash_key_dict, test_hash_dictionary, threshold = 30):
+        self.output_folder_path = output_folder_path
         self.original_hash_key_dict = original_hash_key_dict #format => {Scene_1 : hash_string, Scene_2 : hash_string, ...}
         self.test_hash_dictionary = test_hash_dictionary #format => {Scene_1 : {attack_1: hash_string,  atatck_2: hash_string, ..}, ...}
+        self.threshold = threshold
 
     def calculate_metrics(self, TP, TN, FP, FN):
         precision = TP / (TP + FP) if TP + FP > 0 else 0
@@ -71,7 +73,7 @@ class UniquenessAnalyzer:
 
         return precision, recall, accuracy
 
-    def analyze_hammingDist_between_original_scenes(self, threshold = 30):
+    def analyze_hammingDist_between_original_scenes(self):
         total_combinations = 0
         incorrect = 0
         correct = 0
@@ -87,7 +89,7 @@ class UniquenessAnalyzer:
             hamming_dist_score_array.append(hamming_dist_score)
 
             total_combinations += 1
-            if (hamming_dist_score <= threshold):
+            if (hamming_dist_score <= self.threshold):
                 incorrect += 1
             else:
                 correct += 1 
@@ -96,8 +98,8 @@ class UniquenessAnalyzer:
         print("\tTotal different pair combinations : {}, total_higher_than_threshold: {} , total_lesser_than_threshold : {}".format(total_combinations, correct, incorrect))
         print("\tAccuracy for different original scene pairs: " + str((correct/total_combinations)* 100))
         graphicalVisualizer = GraphicalVisualizer()
-        graphicalVisualizer.plotHistogramHamingDistanceDistribution(hamming_dist_score_array, "Entire Scenes - 10")
-        graphicalVisualizer.plotHeatMapOfOriginalSceneHammingDistances(self.original_hash_key_dict, "Entire Scenes - 10")
+        graphicalVisualizer.plotHistogramHamingDistanceDistribution(self.output_folder_path, hamming_dist_score_array, "Entire Scenes - 10")
+        graphicalVisualizer.plotHeatMapOfOriginalSceneHammingDistances(self.output_folder_path, self.original_hash_key_dict, "Entire Scenes - 10")
 
     def analyzeHDBetweenDifferentTestScenes(self, threshold = 30, attack_name = "FILT130130_30"):
         total_combinations = 0
