@@ -23,7 +23,6 @@ def readMesh(file_path_string):
     return textured_mesh
 
 def readPointCloud(file_path_string):
-
     input_file_path_data = Path(file_path_string)
     point_cloud = o3d.io.read_point_cloud(file_path_string)
     return point_cloud
